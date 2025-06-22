@@ -11,10 +11,6 @@
   "dependencies": {
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
-    "firebase/app": "^11.9.1",
-    "firebase/analytics": "^11.9.1",
-    "firebase/auth": "^11.9.1",
-    "firebase/database": "^11.9.1",
     "firebase": "^11.9.1"
   },
   "devDependencies": {

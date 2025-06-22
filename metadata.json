@@ -1,0 +1,7 @@
+
+{
+  "name": "Inventory Management App (RTDB - No Auth)",
+  "description": "A web application to manage inventory items using Firebase Realtime Database. Provides direct access to product stock view and an admin panel for managing categories and items. All data is stored in Firebase RTDB and requires public read/write access rules.",
+  "requestFramePermissions": [],
+  "prompt": "amar login and register system dorkar nai... app er home page a e user panel thakbe sekhan theke e navigate kore admin panel a jawa jabe... \n\nadmin panel a category, sub category, product sob firebase er realtime database a add kora jabe.\n\nprottekta function jeno properly work kore,,\n\nai jinis gulo code er maje update kore daw"
+}

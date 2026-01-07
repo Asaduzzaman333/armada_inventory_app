@@ -912,7 +912,7 @@ const handleDeleteSubcategory = async (categoryId: string, categoryName: string,
   return (
     <div className="container">
       <header className="app-header">
-        <h1>Inventory Management (ARMADA)</h1>
+        <h1>Armada Inventory Management</h1>
         <div className="header-controls">
           {viewMode === 'admin' && (
             <input

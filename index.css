@@ -909,6 +909,12 @@ select {
   color: var(--success-color-dark);
   margin-bottom: 0.5rem;
 }
+.product-stock-card .current-stock {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--dark-color);
+  margin-bottom: 0.5rem;
+}
 .product-stock-card .description {
   font-size: 0.85rem;
   color: var(--muted-text-color);

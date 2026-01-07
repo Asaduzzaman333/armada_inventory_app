@@ -209,6 +209,7 @@ const ProductStockView: React.FC<ProductStockViewProps> = ({
               <h3>{item.name}</h3>
               <p className="sku">SKU: {item.sku}</p>
               <p className="price">Price: ৳{item.price.toFixed(2)}</p>
+              <p className="current-stock">Available Stock: {calculateTotalQuantity(item.sizes)}</p>
               {item.description && <p className="description">{item.description}</p>}
             </div>
             {item.imageUrl && (

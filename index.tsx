@@ -425,6 +425,7 @@ const App: React.FC = () => {
   const isHandlingPopStateRef = useRef(false);
   const isInitialHistoryRef = useRef(true);
   const historyIndexRef = useRef(0);
+  const hasSeededHistoryRef = useRef(false);
 
   console.warn("IMPORTANT: This app uses Firebase Realtime Database without authentication. Ensure your RTDB security rules are set to allow public read/write for '/categories' and '/products'. This is for development/testing only and is insecure for production.");
 
@@ -464,12 +465,22 @@ const App: React.FC = () => {
     const currentState = window.history.state as AppHistoryState | null;
 
     if (isInitialHistoryRef.current) {
-      if (currentState && currentState.__app === APP_HISTORY_KEY && typeof currentState.historyIndex === 'number') {
-        historyIndexRef.current = currentState.historyIndex;
+      const hasAppState = !!(currentState && currentState.__app === APP_HISTORY_KEY && typeof currentState.historyIndex === 'number');
+      if (hasAppState) {
+        historyIndexRef.current = currentState!.historyIndex;
       } else {
         historyIndexRef.current = 0;
       }
       window.history.replaceState(buildHistoryState(historyIndexRef.current), '');
+
+      if (!hasSeededHistoryRef.current && (!hasAppState || historyIndexRef.current === 0)) {
+        historyIndexRef.current += 1;
+        window.history.pushState(buildHistoryState(historyIndexRef.current), '');
+        hasSeededHistoryRef.current = true;
+      } else if (!hasSeededHistoryRef.current) {
+        hasSeededHistoryRef.current = true;
+      }
+
       isInitialHistoryRef.current = false;
       return;
     }

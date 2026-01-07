@@ -40,6 +40,7 @@ const rtdb = getDatabase(firebaseApp); // Initialize Realtime Database
 
 const SIZES = ["XS", "S", "M", "L", "XL", "XXL", "3XL"] as const;
 type Size = typeof SIZES[number];
+const ADMIN_PANEL_PASSWORD = 'armada2026';
 
 // UserDocument interface removed as authentication is removed
 
@@ -716,7 +717,20 @@ const App: React.FC = () => {
     item.category === selectedCategoryForView && item.subcategory === selectedSubcategoryForView
   );
 
+  const requestAdminAccess = () => {
+    const entered = window.prompt('Enter admin password to access the admin panel:');
+    if (entered === null) return false;
+    if (entered.trim() !== ADMIN_PANEL_PASSWORD) {
+      alert('Incorrect password. Access denied.');
+      return false;
+    }
+    return true;
+  };
+
   const toggleViewMode = () => {
+    if (viewMode === 'stock' && !requestAdminAccess()) {
+      return;
+    }
     setViewMode(prevMode => {
         const newMode = prevMode === 'admin' ? 'stock' : 'admin';
         if (newMode === 'stock') {

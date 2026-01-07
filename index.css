@@ -945,6 +945,7 @@ select {
   border: 1px solid rgba(15, 28, 44, 0.1);
   font-size: 0.9rem;
   display: flex;
+  flex-wrap: wrap;
   justify-content: space-between;
   align-items: center;
   gap: 0.3rem; 
@@ -1266,7 +1267,7 @@ select {
     grid-template-columns: 1fr; 
   }
   .sizes-overview ul {
-    grid-template-columns: repeat(auto-fit, minmax(90px, 1fr)); 
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); 
   }
   .category-forms-grid {
     grid-template-columns: 1fr; 

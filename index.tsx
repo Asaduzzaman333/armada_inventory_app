@@ -60,6 +60,16 @@ interface InventoryItem {
   description?: string;
 }
 
+const APP_HISTORY_KEY = 'inventory-app';
+
+interface AppHistoryState {
+  __app: typeof APP_HISTORY_KEY;
+  viewMode: 'admin' | 'stock';
+  selectedCategoryForView: string | null;
+  selectedSubcategoryForView: string | null;
+  historyIndex: number;
+}
+
 const calculateTotalQuantity = (sizes: Record<Size, number>): number => {
   return SIZES.reduce((sum, size) => sum + (sizes[size] || 0), 0);
 };
@@ -412,7 +422,67 @@ const App: React.FC = () => {
   const [initialItemsLoaded, setInitialItemsLoaded] = useState(false);
   const [initialCategoriesLoaded, setInitialCategoriesLoaded] = useState(false);
 
+  const isHandlingPopStateRef = useRef(false);
+  const isInitialHistoryRef = useRef(true);
+  const historyIndexRef = useRef(0);
+
   console.warn("IMPORTANT: This app uses Firebase Realtime Database without authentication. Ensure your RTDB security rules are set to allow public read/write for '/categories' and '/products'. This is for development/testing only and is insecure for production.");
+
+  const buildHistoryState = (index: number): AppHistoryState => ({
+    __app: APP_HISTORY_KEY,
+    viewMode,
+    selectedCategoryForView,
+    selectedSubcategoryForView,
+    historyIndex: index,
+  });
+
+  useEffect(() => {
+    const handlePopState = (event: PopStateEvent) => {
+      const state = event.state as AppHistoryState | null;
+      if (!state || state.__app !== APP_HISTORY_KEY) {
+        return;
+      }
+
+      historyIndexRef.current = typeof state.historyIndex === 'number' ? state.historyIndex : 0;
+      isHandlingPopStateRef.current = true;
+
+      setViewMode(state.viewMode);
+      if (state.viewMode === 'stock') {
+        setSelectedCategoryForView(state.selectedCategoryForView);
+        setSelectedSubcategoryForView(state.selectedSubcategoryForView);
+      } else {
+        setSelectedCategoryForView(null);
+        setSelectedSubcategoryForView(null);
+      }
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
+  useEffect(() => {
+    const currentState = window.history.state as AppHistoryState | null;
+
+    if (isInitialHistoryRef.current) {
+      if (currentState && currentState.__app === APP_HISTORY_KEY && typeof currentState.historyIndex === 'number') {
+        historyIndexRef.current = currentState.historyIndex;
+      } else {
+        historyIndexRef.current = 0;
+      }
+      window.history.replaceState(buildHistoryState(historyIndexRef.current), '');
+      isInitialHistoryRef.current = false;
+      return;
+    }
+
+    if (isHandlingPopStateRef.current) {
+      isHandlingPopStateRef.current = false;
+      window.history.replaceState(buildHistoryState(historyIndexRef.current), '');
+      return;
+    }
+
+    historyIndexRef.current += 1;
+    window.history.pushState(buildHistoryState(historyIndexRef.current), '');
+  }, [viewMode, selectedCategoryForView, selectedSubcategoryForView]);
 
   // Fetch Categories from RTDB
   useEffect(() => {
@@ -796,6 +866,11 @@ const handleDeleteSubcategory = async (categoryId: string, categoryName: string,
   };
 
   const handleNavigateBackFromStockView = () => {
+    if (historyIndexRef.current > 0) {
+      window.history.back();
+      return;
+    }
+
     if (selectedSubcategoryForView) {
       setSelectedSubcategoryForView(null);
     } else if (selectedCategoryForView) {

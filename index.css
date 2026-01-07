@@ -934,7 +934,7 @@ select {
   padding: 0;
   margin: 0;
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); 
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); 
   gap: 0.5rem;
 }
 
@@ -944,11 +944,10 @@ select {
   border-radius: var(--border-radius-sm);
   border: 1px solid rgba(15, 28, 44, 0.1);
   font-size: 0.9rem;
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: space-between;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
   align-items: center;
-  gap: 0.3rem; 
+  column-gap: 0.4rem; 
 }
 .sizes-overview .size-label {
   font-weight: 500;
@@ -957,8 +956,8 @@ select {
 .sizes-overview .size-quantity {
   font-weight: bold;
   color: var(--primary-color);
-  margin-left: auto; 
-  padding-right: 0.3rem; 
+  text-align: right;
+  min-width: 0;
 }
 
 .btn-sell-size {
@@ -971,6 +970,7 @@ select {
   cursor: pointer;
   transition: transform 0.15s ease-in-out, background-color 0.15s ease-in-out;
   flex-shrink: 0; 
+  white-space: nowrap;
 }
 .btn-sell-size:hover:not(:disabled) {
   background: linear-gradient(135deg, #1f4d39 0%, #163a2a 100%);
@@ -1267,7 +1267,7 @@ select {
     grid-template-columns: 1fr; 
   }
   .sizes-overview ul {
-    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); 
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); 
   }
   .category-forms-grid {
     grid-template-columns: 1fr; 

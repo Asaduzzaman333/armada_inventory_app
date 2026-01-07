@@ -793,6 +793,7 @@ const App: React.FC = () => {
       setIsModalOpen(false);
       setEditingItem(null);
       setLoginError(null);
+      setLoginEmail('');
       setLoginPassword('');
     } catch (error: any) {
       console.error("Error during logout:", error);
@@ -1118,7 +1119,7 @@ const handleDeleteSubcategory = async (categoryId: string, categoryName: string,
           </>
         ) : (
           <div className="login-container">
-            <form className="login-form" onSubmit={handleAdminLogin}>
+            <form className="login-form" onSubmit={handleAdminLogin} autoComplete="off">
               <h2>Admin Login</h2>
               {loginError && <div className="login-error-message">{loginError}</div>}
               <div className="form-group">
@@ -1132,7 +1133,7 @@ const handleDeleteSubcategory = async (categoryId: string, categoryName: string,
                     setLoginEmail(e.target.value);
                     if (loginError) setLoginError(null);
                   }}
-                  autoComplete="email"
+                  autoComplete="off"
                   required
                   disabled={isLoggingIn}
                 />
@@ -1148,7 +1149,7 @@ const handleDeleteSubcategory = async (categoryId: string, categoryName: string,
                     setLoginPassword(e.target.value);
                     if (loginError) setLoginError(null);
                   }}
-                  autoComplete="current-password"
+                  autoComplete="new-password"
                   required
                   disabled={isLoggingIn}
                 />

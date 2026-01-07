@@ -11,6 +11,15 @@ import { initializeApp } from 'firebase/app';
 // Analytics was imported but not used, so it's removed.
 // import { getAnalytics } from 'firebase/analytics'; 
 import { 
+  getAuth,
+  onAuthStateChanged,
+  signInWithEmailAndPassword,
+  signOut,
+  setPersistence,
+  browserLocalPersistence,
+} from 'firebase/auth';
+import type { User } from 'firebase/auth';
+import { 
   getDatabase,
   ref as dbRef, 
   set,
@@ -37,12 +46,12 @@ const firebaseConfig = {
 const firebaseApp = initializeApp(firebaseConfig);
 // const analytics = getAnalytics(firebaseApp); // Removed
 const rtdb = getDatabase(firebaseApp); // Initialize Realtime Database
+const auth = getAuth(firebaseApp);
 
 const SIZES = ["XS", "S", "M", "L", "XL", "XXL", "3XL"] as const;
 type Size = typeof SIZES[number];
-const ADMIN_PANEL_PASSWORD = 'armada2026';
 
-// UserDocument interface removed as authentication is removed
+// UserDocument interface not used; admin auth handled via Firebase Auth
 
 interface CategoryDefinition {
   id: string; 
@@ -236,7 +245,7 @@ const ProductStockView: React.FC<ProductStockViewProps> = ({
   );
 };
 
-// LoginView and RegistrationView components removed
+// Login view is rendered inline inside App
 
 interface AdminCategoryManagerProps {
   categories: CategoryDefinition[];
@@ -431,6 +440,13 @@ const App: React.FC = () => {
   const [editingItem, setEditingItem] = useState<InventoryItem | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
     
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [isAuthReady, setIsAuthReady] = useState(false);
+  const [loginEmail, setLoginEmail] = useState('');
+  const [loginPassword, setLoginPassword] = useState('');
+  const [loginError, setLoginError] = useState<string | null>(null);
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
+
   const [viewMode, setViewMode] = useState<'admin' | 'stock'>('stock'); 
   const [selectedCategoryForView, setSelectedCategoryForView] = useState<string | null>(null);
   const [selectedSubcategoryForView, setSelectedSubcategoryForView] = useState<string | null>(null);
@@ -444,6 +460,19 @@ const App: React.FC = () => {
   const hasSeededHistoryRef = useRef(false);
 
   console.warn("IMPORTANT: This app uses Firebase Realtime Database without authentication. Ensure your RTDB security rules are set to allow public read/write for '/categories' and '/products'. This is for development/testing only and is insecure for production.");
+
+  useEffect(() => {
+    setPersistence(auth, browserLocalPersistence).catch((error) => {
+      console.error("Failed to set auth persistence. Falling back to default behavior.", error);
+    });
+
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      setCurrentUser(user);
+      setIsAuthReady(true);
+    });
+
+    return () => unsubscribe();
+  }, []);
 
   const buildHistoryState = (index: number): AppHistoryState => ({
     __app: APP_HISTORY_KEY,
@@ -733,20 +762,45 @@ const App: React.FC = () => {
     item.category === selectedCategoryForView && item.subcategory === selectedSubcategoryForView
   );
 
-  const requestAdminAccess = () => {
-    const entered = window.prompt('Enter admin password to access the admin panel:');
-    if (entered === null) return false;
-    if (entered.trim() !== ADMIN_PANEL_PASSWORD) {
-      alert('Incorrect password. Access denied.');
-      return false;
+  const handleAdminLogin = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!loginEmail.trim() || !loginPassword) return;
+    setLoginError(null);
+    setIsLoggingIn(true);
+    try {
+      await signInWithEmailAndPassword(auth, loginEmail.trim(), loginPassword);
+      setLoginPassword('');
+    } catch (error: any) {
+      let message = 'Login failed. Please check your email and password.';
+      const code = error?.code || '';
+      if (code === 'auth/invalid-email') message = 'Invalid email address.';
+      if (code === 'auth/invalid-credential') message = 'Invalid email or password.';
+      if (code === 'auth/user-not-found') message = 'No user found for this email.';
+      if (code === 'auth/wrong-password') message = 'Incorrect password.';
+      if (code === 'auth/too-many-requests') message = 'Too many attempts. Please try again later.';
+      setLoginError(message);
+    } finally {
+      setIsLoggingIn(false);
     }
-    return true;
+  };
+
+  const handleLogout = async () => {
+    try {
+      await signOut(auth);
+      setViewMode('stock');
+      setSelectedCategoryForView(null);
+      setSelectedSubcategoryForView(null);
+      setIsModalOpen(false);
+      setEditingItem(null);
+      setLoginError(null);
+      setLoginPassword('');
+    } catch (error: any) {
+      console.error("Error during logout:", error);
+      alert("Logout failed. Please try again.");
+    }
   };
 
   const toggleViewMode = () => {
-    if (viewMode === 'stock' && !requestAdminAccess()) {
-      return;
-    }
     setViewMode(prevMode => {
         const newMode = prevMode === 'admin' ? 'stock' : 'admin';
         if (newMode === 'stock') {
@@ -924,6 +978,14 @@ const handleDeleteSubcategory = async (categoryId: string, categoryName: string,
   }, [items]);
 
 
+  if (!isAuthReady) {
+    return (
+        <div className="loading-container">
+            <p>Loading authentication status...</p>
+        </div>
+    );
+  }
+
   if (!initialCategoriesLoaded || !initialItemsLoaded) {
     let statusParts: string[] = [];
     if (!initialCategoriesLoaded) statusParts.push("categories");
@@ -938,13 +1000,20 @@ const handleDeleteSubcategory = async (categoryId: string, categoryName: string,
         </div>
     ); 
   }
+
+  const adminToggleLabel = viewMode === 'admin'
+    ? 'View Product Stock'
+    : (currentUser ? 'View Admin Panel' : 'Admin Login');
+  const adminToggleAriaLabel = viewMode === 'admin'
+    ? 'Switch to Product Stock View'
+    : (currentUser ? 'Switch to Admin Panel View' : 'Open Admin Login');
   
   return (
     <div className="container">
       <header className="app-header">
         <h1>Armada Inventory Management</h1>
         <div className="header-controls">
-          {viewMode === 'admin' && (
+          {viewMode === 'admin' && currentUser && (
             <input
               type="text"
               placeholder="Search by name or SKU..."
@@ -957,20 +1026,24 @@ const handleDeleteSubcategory = async (categoryId: string, categoryName: string,
           <button 
             onClick={toggleViewMode} 
             className="btn btn-info" 
-            aria-label={viewMode === 'admin' ? "Switch to Product Stock View" : "Switch to Admin Panel View"}
+            aria-label={adminToggleAriaLabel}
           >
-            {viewMode === 'admin' ? 'View Product Stock' : 'View Admin Panel'}
+            {adminToggleLabel}
           </button>
-          {viewMode === 'admin' && (
+          {viewMode === 'admin' && currentUser && (
             <button onClick={() => openModal()} className="btn btn-primary" aria-label="Add new item">
               Add New Item
             </button>
           )}
-          {/* Logout button removed */}
+          {currentUser && (
+            <button onClick={handleLogout} className="btn btn-secondary" aria-label="Logout from admin">
+              Logout
+            </button>
+          )}
         </div>
       </header>
 
-      {viewMode === 'admin' && isModalOpen && (
+      {viewMode === 'admin' && currentUser && isModalOpen && (
         <ItemModal
           item={editingItem}
           onClose={closeModal}
@@ -981,67 +1054,117 @@ const handleDeleteSubcategory = async (categoryId: string, categoryName: string,
       )}
       
       {viewMode === 'admin' ? (
-        <>
-          <AdminCategoryManager
-            categories={categories}
-            onAddCategory={handleAddCategory}
-            onDeleteCategory={handleDeleteCategory}
-            onAddSubcategory={handleAddSubcategory}
-            onDeleteSubcategory={handleDeleteSubcategory}
-            items={items}
-          />
-          <main className="inventory-table-container">
-            {!initialItemsLoaded && <div className="loading-container"><p>Loading items...</p></div>}
-            {initialItemsLoaded && filteredItemsForAdminTable.length === 0 && !searchTerm && (
-               <div className="empty-state">
-                 <h2>No items in inventory.</h2>
-                 <p>Click "Add New Item" to get started.</p>
-               </div>
-            )}
-             {initialItemsLoaded && filteredItemsForAdminTable.length === 0 && searchTerm && (
-                <div className="empty-state">
-                  <h2>No items match your search "{searchTerm}".</h2>
-                  <p>Try a different search term or clear the search.</p>
-                </div>
-            )}
-            {initialItemsLoaded && filteredItemsForAdminTable.length > 0 && (
-              <table className="inventory-table" aria-label="Inventory Items">
-                <thead>
-                  <tr>
-                    <th>Name</th>
-                    <th>SKU</th>
-                    <th>Category</th>
-                    <th>Subcategory</th>
-                    <th>Total Quantity</th>
-                    <th>Price</th>
-                    <th>Description</th>
-                    <th>Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredItemsForAdminTable.map(item => {
-                    const totalQuantity = calculateTotalQuantity(item.sizes);
-                    return (
-                      <tr key={item.id}>
-                        <td data-label="Name">{item.name}</td>
-                        <td data-label="SKU">{item.sku}</td>
-                        <td data-label="Category">{item.category}</td>
-                        <td data-label="Subcategory">{item.subcategory}</td>
-                        <td data-label="Total Quantity">{totalQuantity}</td>
-                        <td data-label="Price">${item.price.toFixed(2)}</td>
-                        <td data-label="Description">{item.description || '-'}</td>
-                        <td data-label="Actions" className="actions-cell">
-                          <button onClick={() => openModal(item)} className="btn btn-secondary btn-sm" aria-label={`Edit ${item.name}`}>Edit</button>
-                          <button onClick={() => handleDeleteItem(item.id)} className="btn btn-danger btn-sm" aria-label={`Delete ${item.name}`}>Delete</button>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            )}
-          </main>
-        </>
+        currentUser ? (
+          <>
+            <AdminCategoryManager
+              categories={categories}
+              onAddCategory={handleAddCategory}
+              onDeleteCategory={handleDeleteCategory}
+              onAddSubcategory={handleAddSubcategory}
+              onDeleteSubcategory={handleDeleteSubcategory}
+              items={items}
+            />
+            <main className="inventory-table-container">
+              {!initialItemsLoaded && <div className="loading-container"><p>Loading items...</p></div>}
+              {initialItemsLoaded && filteredItemsForAdminTable.length === 0 && !searchTerm && (
+                 <div className="empty-state">
+                   <h2>No items in inventory.</h2>
+                   <p>Click "Add New Item" to get started.</p>
+                 </div>
+              )}
+               {initialItemsLoaded && filteredItemsForAdminTable.length === 0 && searchTerm && (
+                  <div className="empty-state">
+                    <h2>No items match your search "{searchTerm}".</h2>
+                    <p>Try a different search term or clear the search.</p>
+                  </div>
+              )}
+              {initialItemsLoaded && filteredItemsForAdminTable.length > 0 && (
+                <table className="inventory-table" aria-label="Inventory Items">
+                  <thead>
+                    <tr>
+                      <th>Name</th>
+                      <th>SKU</th>
+                      <th>Category</th>
+                      <th>Subcategory</th>
+                      <th>Total Quantity</th>
+                      <th>Price</th>
+                      <th>Description</th>
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredItemsForAdminTable.map(item => {
+                      const totalQuantity = calculateTotalQuantity(item.sizes);
+                      return (
+                        <tr key={item.id}>
+                          <td data-label="Name">{item.name}</td>
+                          <td data-label="SKU">{item.sku}</td>
+                          <td data-label="Category">{item.category}</td>
+                          <td data-label="Subcategory">{item.subcategory}</td>
+                          <td data-label="Total Quantity">{totalQuantity}</td>
+                          <td data-label="Price">${item.price.toFixed(2)}</td>
+                          <td data-label="Description">{item.description || '-'}</td>
+                          <td data-label="Actions" className="actions-cell">
+                            <button onClick={() => openModal(item)} className="btn btn-secondary btn-sm" aria-label={`Edit ${item.name}`}>Edit</button>
+                            <button onClick={() => handleDeleteItem(item.id)} className="btn btn-danger btn-sm" aria-label={`Delete ${item.name}`}>Delete</button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              )}
+            </main>
+          </>
+        ) : (
+          <div className="login-container">
+            <form className="login-form" onSubmit={handleAdminLogin}>
+              <h2>Admin Login</h2>
+              {loginError && <div className="login-error-message">{loginError}</div>}
+              <div className="form-group">
+                <label htmlFor="loginEmail">Email</label>
+                <input
+                  type="email"
+                  id="loginEmail"
+                  name="loginEmail"
+                  value={loginEmail}
+                  onChange={(e) => {
+                    setLoginEmail(e.target.value);
+                    if (loginError) setLoginError(null);
+                  }}
+                  autoComplete="email"
+                  required
+                  disabled={isLoggingIn}
+                />
+              </div>
+              <div className="form-group">
+                <label htmlFor="loginPassword">Password</label>
+                <input
+                  type="password"
+                  id="loginPassword"
+                  name="loginPassword"
+                  value={loginPassword}
+                  onChange={(e) => {
+                    setLoginPassword(e.target.value);
+                    if (loginError) setLoginError(null);
+                  }}
+                  autoComplete="current-password"
+                  required
+                  disabled={isLoggingIn}
+                />
+              </div>
+              <button type="submit" className="btn btn-primary btn-login" disabled={isLoggingIn}>
+                {isLoggingIn ? 'Logging in...' : 'Login'}
+              </button>
+              <p className="auth-switch-message">
+                Back to product stock?{' '}
+                <button type="button" className="btn-link" onClick={() => setViewMode('stock')}>
+                  View stock
+                </button>
+              </p>
+            </form>
+          </div>
+        )
       ) : (
         <ProductStockView
           items={itemsForProductStockView}

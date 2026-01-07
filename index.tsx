@@ -95,6 +95,7 @@ interface ProductStockViewProps {
   onNavigateBack: () => void;
   onSellItemSize: (itemId: string, size: Size) => void;
   getCategoryItemCount: (categoryName: string, subcategoryName: string) => number;
+  isAdmin: boolean;
   // currentUser prop removed
 }
 
@@ -108,6 +109,7 @@ const ProductStockView: React.FC<ProductStockViewProps> = ({
   onNavigateBack,
   onSellItemSize,
   getCategoryItemCount,
+  isAdmin,
 }) => {
   if (!selectedCategoryName) {
     return (
@@ -206,7 +208,7 @@ const ProductStockView: React.FC<ProductStockViewProps> = ({
             <div className="product-stock-card-details">
               <h3>{item.name}</h3>
               <p className="sku">SKU: {item.sku}</p>
-              <p className="price">Price: ${item.price.toFixed(2)}</p>
+              <p className="price">Price: ৳{item.price.toFixed(2)}</p>
               {item.description && <p className="description">{item.description}</p>}
             </div>
             {item.imageUrl && (
@@ -227,14 +229,16 @@ const ProductStockView: React.FC<ProductStockViewProps> = ({
                 <li key={size}>
                   <span className="size-label">{size}:</span>
                   <span className="size-quantity">{item.sizes[size] || 0}</span>
-                  <button
-                    onClick={() => onSellItemSize(item.id, size)}
-                    disabled={(item.sizes[size] || 0) === 0}
-                    className="btn btn-sell-size"
-                    aria-label={`Sell one ${size} of ${item.name}`}
-                  >
-                    Sell 1
-                  </button>
+                  {isAdmin && (
+                    <button
+                      onClick={() => onSellItemSize(item.id, size)}
+                      disabled={(item.sizes[size] || 0) === 0}
+                      className="btn btn-sell-size"
+                      aria-label={`Sell one ${size} of ${item.name}`}
+                    >
+                      Sell 1
+                    </button>
+                  )}
                 </li>
               ))}
             </ul>
@@ -1103,7 +1107,7 @@ const handleDeleteSubcategory = async (categoryId: string, categoryName: string,
                           <td data-label="Category">{item.category}</td>
                           <td data-label="Subcategory">{item.subcategory}</td>
                           <td data-label="Total Quantity">{totalQuantity}</td>
-                          <td data-label="Price">${item.price.toFixed(2)}</td>
+                          <td data-label="Price">৳{item.price.toFixed(2)}</td>
                           <td data-label="Description">{item.description || '-'}</td>
                           <td data-label="Actions" className="actions-cell">
                             <button onClick={() => openModal(item)} className="btn btn-secondary btn-sm" aria-label={`Edit ${item.name}`}>Edit</button>
@@ -1177,6 +1181,7 @@ const handleDeleteSubcategory = async (categoryId: string, categoryName: string,
           onNavigateBack={handleNavigateBackFromStockView}
           onSellItemSize={handleSellItemSize}
           getCategoryItemCount={getCategoryItemCount}
+          isAdmin={!!currentUser}
         />
       )}
       <footer className="app-footer">

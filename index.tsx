@@ -1026,10 +1026,7 @@ const handleDeleteSubcategory = async (categoryId: string, categoryName: string,
         />
       )}
       <footer className="app-footer">
-        <p>&copy; {new Date().getFullYear()} Inventory App. All rights reserved.</p>
-         <p style={{fontSize: "0.8em", color: "#777"}}>
-          IMPORTANT: This app relies on Firebase Realtime Database. For this no-login version, ensure your RTDB security rules allow public read/write to `/categories` and `/products` (e.g., `".read": "true", ".write": "true"`). This is for testing/demo purposes and is insecure for production.
-        </p>
+        <p>&copy; {new Date().getFullYear()} Inventory App. All rights reserved by Armada.</p>
       </footer>
     </div>
   );

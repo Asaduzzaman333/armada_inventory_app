@@ -59,6 +59,7 @@ interface InventoryItem {
   sizes: Record<Size, number>;
   price: number;
   description?: string;
+  imageUrl?: string;
 }
 
 const APP_HISTORY_KEY = 'inventory-app';
@@ -192,6 +193,16 @@ const ProductStockView: React.FC<ProductStockViewProps> = ({
       )}
       {items.map(item => (
         <div key={item.id} className="product-stock-card">
+          {item.imageUrl && (
+            <div className="product-image-container">
+              <img
+                src={item.imageUrl}
+                alt={`${item.name} product`}
+                className="product-image"
+                loading="lazy"
+              />
+            </div>
+          )}
           <h3>{item.name}</h3>
           <p className="sku">SKU: {item.sku}</p>
            <p className="price">Price: ${item.price.toFixed(2)}</p>
@@ -626,6 +637,7 @@ const App: React.FC = () => {
         sizes: itemToSave.sizes,
         price: itemToSave.price,
         description: itemToSave.description,
+        imageUrl: itemToSave.imageUrl?.trim() || '',
     };
     
     try {
@@ -931,7 +943,7 @@ const handleDeleteSubcategory = async (categoryId: string, categoryName: string,
           {viewMode === 'admin' && (
             <input
               type="text"
-              placeholder="Search by name or SKU (in table)..."
+              placeholder="Search by name or SKU..."
               className="search-input"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
@@ -1054,6 +1066,7 @@ interface ItemModalFormData {
   sizes: Record<Size, number>;
   price: number;
   description?: string;
+  imageUrl?: string;
 }
 
 interface ItemModalProps {
@@ -1099,6 +1112,7 @@ const ItemModal: React.FC<ItemModalProps> = ({ item, onClose, onSave, categories
         sizes: SIZES.reduce((acc, size) => { acc[size] = Number(item.sizes?.[size]) || 0; return acc; }, {} as Record<Size, number>),
         price: item.price,
         description: item.description || '',
+        imageUrl: item.imageUrl || '',
       };
     } else { // Adding new item
       if (categories.length > 0) {
@@ -1118,6 +1132,7 @@ const ItemModal: React.FC<ItemModalProps> = ({ item, onClose, onSave, categories
         sizes: defaultSizes,
         price: 0,
         description: '',
+        imageUrl: '',
       };
     }
   }, [item, categories]);
@@ -1253,6 +1268,7 @@ const ItemModal: React.FC<ItemModalProps> = ({ item, onClose, onSave, categories
       sizes: formData.sizes,
       price: Number(formData.price),
       description: formData.description?.trim() || '',
+      imageUrl: formData.imageUrl?.trim() || '',
     };
     
     try {
@@ -1356,6 +1372,19 @@ const ItemModal: React.FC<ItemModalProps> = ({ item, onClose, onSave, categories
             <label htmlFor="price">Price</label>
             <input type="number" id="price" name="price" value={formData.price} onChange={handleChange} min="0" step="0.01" required aria-invalid={!!errors.price} aria-describedby={errors.price ? "price-error" : undefined} disabled={isProcessing}/>
             {errors.price && <p id="price-error" className="error-message">{errors.price}</p>}
+          </div>
+          {/* Image URL */}
+          <div className="form-group">
+            <label htmlFor="imageUrl">Image URL (Optional)</label>
+            <input
+              type="text"
+              id="imageUrl"
+              name="imageUrl"
+              value={formData.imageUrl || ''}
+              onChange={handleChange}
+              placeholder="https://example.com/image.jpg"
+              disabled={isProcessing}
+            />
           </div>
           {/* Description */}
           <div className="form-group">

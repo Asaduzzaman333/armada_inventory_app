@@ -193,20 +193,24 @@ const ProductStockView: React.FC<ProductStockViewProps> = ({
       )}
       {items.map(item => (
         <div key={item.id} className="product-stock-card">
-          {item.imageUrl && (
-            <div className="product-image-container">
-              <img
-                src={item.imageUrl}
-                alt={`${item.name} product`}
-                className="product-image"
-                loading="lazy"
-              />
+          <div className="product-stock-card-header">
+            <div className="product-stock-card-details">
+              <h3>{item.name}</h3>
+              <p className="sku">SKU: {item.sku}</p>
+              <p className="price">Price: ${item.price.toFixed(2)}</p>
+              {item.description && <p className="description">{item.description}</p>}
             </div>
-          )}
-          <h3>{item.name}</h3>
-          <p className="sku">SKU: {item.sku}</p>
-           <p className="price">Price: ${item.price.toFixed(2)}</p>
-          {item.description && <p className="description">{item.description}</p>}
+            {item.imageUrl && (
+              <div className="product-image-container">
+                <img
+                  src={item.imageUrl}
+                  alt={`${item.name} product`}
+                  className="product-image"
+                  loading="lazy"
+                />
+              </div>
+            )}
+          </div>
           <div className="sizes-overview">
             <h4>Available Stock by Size:</h4>
             <ul>

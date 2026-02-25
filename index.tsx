@@ -5,6 +5,7 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { createRoot } from 'react-dom/client';
+import { Workbook } from 'exceljs';
 
 // Firebase SDKs
 import { initializeApp } from 'firebase/app';
@@ -85,7 +86,12 @@ const calculateTotalQuantity = (sizes: Record<Size, number>): number => {
   return SIZES.reduce((sum, size) => sum + (sizes[size] || 0), 0);
 };
 
-type CsvValue = string | number;
+type ExcelImageExtension = 'jpeg' | 'png';
+
+interface WorkbookImageData {
+  buffer: ArrayBuffer;
+  extension: ExcelImageExtension;
+}
 
 const sanitizeFilenamePart = (value: string): string => {
   return value
@@ -94,16 +100,65 @@ const sanitizeFilenamePart = (value: string): string => {
     .trim();
 };
 
-const formatCsvValue = (value: CsvValue): string => {
-  const text = String(value ?? '');
-  if (/[",\r\n]/.test(text)) {
-    return `"${text.replace(/"/g, '""')}"`;
+const getImageExtensionFromContentType = (contentType: string): ExcelImageExtension | null => {
+  const normalizedContentType = contentType.toLowerCase();
+  if (normalizedContentType.includes('image/png')) {
+    return 'png';
   }
-  return text;
+  if (normalizedContentType.includes('image/jpeg') || normalizedContentType.includes('image/jpg')) {
+    return 'jpeg';
+  }
+  return null;
 };
 
-const buildCsvContent = (rows: CsvValue[][]): string => {
-  return rows.map((row) => row.map(formatCsvValue).join(',')).join('\r\n');
+const getImageExtensionFromUrl = (imageUrl: string): ExcelImageExtension | null => {
+  try {
+    const parsedUrl = new URL(imageUrl);
+    const normalizedPath = parsedUrl.pathname.toLowerCase();
+
+    if (normalizedPath.endsWith('.png')) {
+      return 'png';
+    }
+
+    if (normalizedPath.endsWith('.jpg') || normalizedPath.endsWith('.jpeg')) {
+      return 'jpeg';
+    }
+  } catch {
+    return null;
+  }
+
+  return null;
+};
+
+const fetchWorkbookImage = async (imageUrl?: string): Promise<WorkbookImageData | null> => {
+  if (!imageUrl) {
+    return null;
+  }
+
+  try {
+    const response = await fetch(imageUrl);
+    if (!response.ok) {
+      return null;
+    }
+
+    const contentType = response.headers.get('content-type') || '';
+    const extension =
+      getImageExtensionFromContentType(contentType) ||
+      getImageExtensionFromUrl(imageUrl);
+
+    if (!extension) {
+      return null;
+    }
+
+    const buffer = await response.arrayBuffer();
+    if (!buffer.byteLength) {
+      return null;
+    }
+
+    return { buffer, extension };
+  } catch {
+    return null;
+  }
 };
 
 const buildSubcategoryExportFilename = (categoryName: string, subcategoryName: string): string => {
@@ -112,13 +167,14 @@ const buildSubcategoryExportFilename = (categoryName: string, subcategoryName: s
   const baseName = [safeCategory || 'category', safeSubcategory || 'subcategory', 'stock']
     .filter(Boolean)
     .join('_');
-  return `${baseName || 'subcategory_stock'}.csv`;
+  return `${baseName || 'subcategory_stock'}.xlsx`;
 };
 
-const downloadCsvFile = (filename: string, rows: CsvValue[][]): void => {
-  // Prefix with BOM for Excel UTF-8 support.
-  const csvContent = `\ufeff${buildCsvContent(rows)}`;
-  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+const downloadWorkbookAsXlsx = async (filename: string, workbook: Workbook): Promise<void> => {
+  const workbookBuffer = await workbook.xlsx.writeBuffer();
+  const blob = new Blob([workbookBuffer], {
+    type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  });
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
   link.href = url;
@@ -155,18 +211,76 @@ const ProductStockView: React.FC<ProductStockViewProps> = ({
   getCategoryItemCount,
   isAdmin,
 }) => {
-  const handleExportSubcategory = () => {
-    if (!selectedCategoryName || !selectedSubcategoryName) return;
+  const [isExportingSubcategory, setIsExportingSubcategory] = useState(false);
 
-    const headerRow: CsvValue[] = ['Name', 'Image URL', ...SIZES];
-    const dataRows: CsvValue[][] = items.map(item => ([
-      item.name,
-      item.imageUrl || '',
-      ...SIZES.map(size => item.sizes[size] || 0),
-    ]));
+  const handleExportSubcategoryXlsx = async () => {
+    if (
+      isExportingSubcategory ||
+      !selectedCategoryName ||
+      !selectedSubcategoryName ||
+      items.length === 0
+    ) {
+      return;
+    }
 
-    const filename = buildSubcategoryExportFilename(selectedCategoryName, selectedSubcategoryName);
-    downloadCsvFile(filename, [headerRow, ...dataRows]);
+    setIsExportingSubcategory(true);
+
+    try {
+      const workbook = new Workbook();
+      const worksheet = workbook.addWorksheet('Subcategory Stock');
+
+      const headerRow = worksheet.addRow(['Name', 'Photo', ...SIZES]);
+      headerRow.font = { bold: true };
+      headerRow.alignment = { horizontal: 'center', vertical: 'middle' };
+      headerRow.height = 22;
+
+      worksheet.getColumn(1).width = 34;
+      worksheet.getColumn(2).width = 16;
+
+      SIZES.forEach((_, index) => {
+        worksheet.getColumn(index + 3).width = 10;
+      });
+
+      for (const item of items) {
+        const row = worksheet.addRow([
+          item.name,
+          '',
+          ...SIZES.map(size => item.sizes[size] || 0),
+        ]);
+
+        row.alignment = { vertical: 'middle' };
+
+        for (let columnIndex = 3; columnIndex <= SIZES.length + 2; columnIndex += 1) {
+          row.getCell(columnIndex).alignment = { horizontal: 'center', vertical: 'middle' };
+        }
+
+        const imageData = await fetchWorkbookImage(item.imageUrl);
+        if (!imageData) {
+          continue;
+        }
+
+        const imageId = workbook.addImage({
+          buffer: imageData.buffer,
+          extension: imageData.extension,
+        });
+
+        row.height = 72;
+
+        worksheet.addImage(imageId, {
+          tl: { col: 1, row: row.number - 1 },
+          br: { col: 2, row: row.number },
+          editAs: 'oneCell',
+        });
+      }
+
+      const filename = buildSubcategoryExportFilename(selectedCategoryName, selectedSubcategoryName);
+      await downloadWorkbookAsXlsx(filename, workbook);
+    } catch (error) {
+      console.error('Failed to export XLSX:', error);
+      alert('Failed to export XLSX file. Please try again.');
+    } finally {
+      setIsExportingSubcategory(false);
+    }
   };
 
   if (!selectedCategoryName) {
@@ -257,12 +371,12 @@ const ProductStockView: React.FC<ProductStockViewProps> = ({
       {isAdmin && (
         <div className="subcategory-export-bar">
           <button
-            onClick={handleExportSubcategory}
+            onClick={handleExportSubcategoryXlsx}
             className="btn btn-success"
-            aria-label={`Export ${selectedCategoryName} ${selectedSubcategoryName} stock to CSV`}
-            disabled={items.length === 0}
+            aria-label={`Export ${selectedCategoryName} ${selectedSubcategoryName} stock to XLSX`}
+            disabled={items.length === 0 || isExportingSubcategory}
           >
-            Export Excel (CSV)
+            {isExportingSubcategory ? 'Exporting Excel...' : 'Export Excel (.xlsx)'}
           </button>
         </div>
       )}

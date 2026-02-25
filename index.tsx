@@ -89,7 +89,7 @@ const calculateTotalQuantity = (sizes: Record<Size, number>): number => {
 type ExcelImageExtension = 'jpeg' | 'png';
 
 interface WorkbookImageData {
-  buffer: ArrayBuffer;
+  base64: string;
   extension: ExcelImageExtension;
 }
 
@@ -150,12 +150,25 @@ const fetchWorkbookImage = async (imageUrl?: string): Promise<WorkbookImageData 
       return null;
     }
 
-    const buffer = await response.arrayBuffer();
-    if (!buffer.byteLength) {
+    const imageBlob = await response.blob();
+    if (!imageBlob.size) {
       return null;
     }
 
-    return { buffer, extension };
+    const base64 = await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        if (typeof reader.result === 'string') {
+          resolve(reader.result);
+          return;
+        }
+        reject(new Error('Failed to convert image to base64.'));
+      };
+      reader.onerror = () => reject(new Error('Failed to read image data.'));
+      reader.readAsDataURL(imageBlob);
+    });
+
+    return { base64, extension };
   } catch {
     return null;
   }
@@ -260,7 +273,7 @@ const ProductStockView: React.FC<ProductStockViewProps> = ({
         }
 
         const imageId = workbook.addImage({
-          buffer: imageData.buffer,
+          base64: imageData.base64,
           extension: imageData.extension,
         });
 

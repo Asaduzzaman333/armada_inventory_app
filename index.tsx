@@ -389,7 +389,7 @@ const ProductStockView: React.FC<ProductStockViewProps> = ({
             aria-label={`Export ${selectedCategoryName} ${selectedSubcategoryName} stock to XLSX`}
             disabled={items.length === 0 || isExportingSubcategory}
           >
-            {isExportingSubcategory ? 'Exporting Excel...' : 'Export Excel (.xlsx)'}
+            {isExportingSubcategory ? 'Exporting Excel...' : 'Export Excel'}
           </button>
         </div>
       )}

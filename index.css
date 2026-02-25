@@ -760,6 +760,13 @@ select {
   grid-column: 1 / -1; 
 }
 
+.subcategory-export-bar {
+  grid-column: 1 / -1;
+  display: flex;
+  justify-content: flex-end;
+  margin: 0 0 0.75rem;
+}
+
 
 .category-grid {
   display: grid;

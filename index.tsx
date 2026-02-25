@@ -85,6 +85,50 @@ const calculateTotalQuantity = (sizes: Record<Size, number>): number => {
   return SIZES.reduce((sum, size) => sum + (sizes[size] || 0), 0);
 };
 
+type CsvValue = string | number;
+
+const sanitizeFilenamePart = (value: string): string => {
+  return value
+    .replace(/[<>:"/\\|?*\x00-\x1F]/g, '')
+    .replace(/\s+/g, '_')
+    .trim();
+};
+
+const formatCsvValue = (value: CsvValue): string => {
+  const text = String(value ?? '');
+  if (/[",\r\n]/.test(text)) {
+    return `"${text.replace(/"/g, '""')}"`;
+  }
+  return text;
+};
+
+const buildCsvContent = (rows: CsvValue[][]): string => {
+  return rows.map((row) => row.map(formatCsvValue).join(',')).join('\r\n');
+};
+
+const buildSubcategoryExportFilename = (categoryName: string, subcategoryName: string): string => {
+  const safeCategory = sanitizeFilenamePart(categoryName);
+  const safeSubcategory = sanitizeFilenamePart(subcategoryName);
+  const baseName = [safeCategory || 'category', safeSubcategory || 'subcategory', 'stock']
+    .filter(Boolean)
+    .join('_');
+  return `${baseName || 'subcategory_stock'}.csv`;
+};
+
+const downloadCsvFile = (filename: string, rows: CsvValue[][]): void => {
+  // Prefix with BOM for Excel UTF-8 support.
+  const csvContent = `\ufeff${buildCsvContent(rows)}`;
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+};
+
 interface ProductStockViewProps {
   items: InventoryItem[];
   allCategories: CategoryDefinition[];
@@ -111,6 +155,20 @@ const ProductStockView: React.FC<ProductStockViewProps> = ({
   getCategoryItemCount,
   isAdmin,
 }) => {
+  const handleExportSubcategory = () => {
+    if (!selectedCategoryName || !selectedSubcategoryName) return;
+
+    const headerRow: CsvValue[] = ['Name', 'Image URL', ...SIZES];
+    const dataRows: CsvValue[][] = items.map(item => ([
+      item.name,
+      item.imageUrl || '',
+      ...SIZES.map(size => item.sizes[size] || 0),
+    ]));
+
+    const filename = buildSubcategoryExportFilename(selectedCategoryName, selectedSubcategoryName);
+    downloadCsvFile(filename, [headerRow, ...dataRows]);
+  };
+
   if (!selectedCategoryName) {
     return (
       <div className="category-selection-container">
@@ -196,6 +254,18 @@ const ProductStockView: React.FC<ProductStockViewProps> = ({
         </button>
         <h2>{selectedCategoryName} &gt; {selectedSubcategoryName}</h2>
       </div>
+      {isAdmin && (
+        <div className="subcategory-export-bar">
+          <button
+            onClick={handleExportSubcategory}
+            className="btn btn-success"
+            aria-label={`Export ${selectedCategoryName} ${selectedSubcategoryName} stock to CSV`}
+            disabled={items.length === 0}
+          >
+            Export Excel (CSV)
+          </button>
+        </div>
+      )}
       {items.length === 0 && (
         <div className="product-stock-view-container empty-state full-span-empty">
           <h2>No products found in this subcategory.</h2>
